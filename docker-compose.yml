@@ -1,0 +1,42 @@
+version: '0'
+services:
+  app_order:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    env_file: ./.env
+    ports:
+      - $NODE_DOCKER_PORT:$NODE_DOCKER_PORT
+    environment:
+      - DB_HOST=db
+      - DB_USER=$MYSQLDB_USER
+      - DB_PASSWORD=$MYSQLDB_ROOT_PASSWORD
+      - DB_NAME=$MYSQLDB_DATABASE
+      - DB_PORT=$MYSQLDB_DOCKER_PORT
+    networks:
+      - backend 
+    depends_on:
+      - db_order
+  db_order:
+    image: mysql:latest
+    restart: always
+    env_file: ./.env
+    ports:
+      - $MYSQLDB_DOCKER_PORT:$MYSQLDB_DOCKER_PORT
+    volumes:
+      - db_order:/var/lib/mysql  
+    environment:
+      - MYSQL_ROOT_PASSWORD=$MYSQLDB_ROOT_PASSWORD
+      - MYSQL_DATABASE=$MYSQLDB_DATABASE
+    expose:
+      - '3306'
+    networks:
+      - backend
+    stdin_open: true
+    tty: true
+networks:
+  backend:
+    driver: 'bridge'
+volumes: 
+  db_order:
