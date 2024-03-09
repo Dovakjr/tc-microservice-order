@@ -7,7 +7,7 @@ export class CreateOrderUseCase {
 
   async execute(data: CreateOrderDto): Promise<Order> {
     //Create new order
-    const order = new Order('Recebido', data.user_id, data.products);
+    const order = new Order(data.status, data.user_id, data.products);
     return this.orderRepository.create(order);
   }
 }

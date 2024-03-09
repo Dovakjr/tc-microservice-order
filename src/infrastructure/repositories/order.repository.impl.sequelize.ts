@@ -4,13 +4,22 @@ import { Injectable } from '@nestjs/common';
 import { OrderModel } from '../models/order.model';
 import { Order } from '../../domain/order.entity';
 import { UpdateOrderDto } from 'src/presentations/dto/update-order.dto';
+import { PubSubService } from '../services/pub-sub.service';
 
 @Injectable()
 export class OrderRepositorySequelize implements IOrderRepository {
   constructor(
     @InjectModel(OrderModel)
     private orderModel: typeof OrderModel,
-  ) {}
+    private readonly pubSubService: PubSubService,
+  ) {
+    this.subscribeToOrderEvents();
+  }
+
+  private decodeBase64(base64String: string): string {
+    // Decodificar a string base64 de volta ao valor original
+    return Buffer.from(base64String, 'base64').toString();
+  }
 
   async create(order: Order): Promise<Order> {
     const newOrder = await this.orderModel.create(order);
@@ -18,6 +27,12 @@ export class OrderRepositorySequelize implements IOrderRepository {
     order.user_id = newOrder.user_id;
     order.id = newOrder.id;
     order.products = newOrder.products;
+
+    await this.pubSubService.publishMessage(
+      'projects/techchallenge-fastfood/topics/new_order_payment',
+      order,
+    );
+
     return order;
   }
 
@@ -49,5 +64,26 @@ export class OrderRepositorySequelize implements IOrderRepository {
   async findAllWithProducts() {
     const orders = await this.orderModel.findAll({});
     return orders;
+  }
+
+  private async subscribeToOrderEvents() {
+    try {
+      await this.pubSubService.subscribe(
+        'projects/techchallenge-fastfood/subscriptions/order_queue-sub',
+        (message) => {
+          //Manage message base64 decoding
+          const messageData = message.data;
+          const string64 = this.decodeBase64(messageData);
+          const originalString = this.decodeBase64(string64);
+          const originalJson = JSON.parse(originalString);
+
+          //Update order status if the order is paid
+          this.update(originalJson.id, { status: 'Recebido' });
+        },
+      );
+      console.log('Subscribed to order_queue-sub successfully.');
+    } catch (error) {
+      console.error('Error subscribing to order_queue-sub:', error);
+    }
   }
 }
